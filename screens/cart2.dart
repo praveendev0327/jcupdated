@@ -17,6 +17,8 @@ import 'package:justcall/modals/products.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:googleapis/servicecontrol/v1.dart' as servicecontrol;
 
 class CartOut extends StatefulWidget {
   const CartOut({super.key});
@@ -30,6 +32,7 @@ class _CartState extends State<CartOut> {
   String orderPlaced = '';
   Map<String, dynamic> userData = {};
   bool? indicator = false;
+  String appToken = '';
 
   // List<JcProductListData> collectionListData =
   //     CollectionConstants.productConstants;
@@ -37,6 +40,7 @@ class _CartState extends State<CartOut> {
   @override
   void initState() {
     super.initState();
+    fetchAllDeliveryAppToken();
     loadData().then((loadedData) {
       if (loadedData != null) {
         setState(() {
@@ -44,6 +48,59 @@ class _CartState extends State<CartOut> {
         });
       }
     });
+  }
+
+
+  void fetchAllDeliveryAppToken() async{
+    setState(() {
+      indicator = true;
+    });
+    try {
+      // final Data = {
+      //   "SubGroupName" :  _selectedSubGroup
+      // };
+      final response = await http.get(
+        Uri.parse("https://justcalltest.onrender.com/api/getDeliveryAppToken") ,
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        // body: jsonEncode(Data),
+      );
+
+      if (response.statusCode == 200) {
+        // Successfully sent data
+        // print('Data sent successfully');
+        final fetch = json.decode( response.body);
+        // print('login fetch : ${fetch }');
+
+        final subGroupList = fetch["data"];
+
+
+        print('All Data from sub group : ${subGroupList[0]['token']}');
+
+        setState(() {
+          // _productsFuture = delivered;
+          appToken = subGroupList[0]['token'];
+        });
+        setState(() {
+          indicator = false;
+        });
+        // print('All Data from sub group : ${fetch["data"]}');
+      } else {
+        // Error occurred while sending data
+        setState(() {
+          indicator = false;
+        });
+        print('Failed to send data: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Exception occurred
+      setState(() {
+        indicator = false;
+      });
+      print('Exception occurred: $e');
+    }
+
   }
 
 
@@ -196,23 +253,49 @@ class _CartState extends State<CartOut> {
     return null; // Return null if no data found
   }
 
+  static Future<String> getAccessToken () async{
+
+
+    List<String> scopes = [
+      "https://www.googleapis.com/auth/firebase.messaging",
+    ];
+
+    http.Client client = await auth.clientViaServiceAccount(
+        auth.ServiceAccountCredentials.fromJson(serviceAccountJson),
+        scopes
+    );
+    auth.AccessCredentials credentials = await auth.obtainAccessCredentialsViaServiceAccount(
+        auth.ServiceAccountCredentials.fromJson(serviceAccountJson),
+        scopes,
+        client
+    );
+    print('AccessToken: $credentials.accessToken.data');
+    client.close();
+    return credentials.accessToken.data;
+  }
+
   Future<void> sendPushMessage(Map<String, dynamic> data) async {
     // String orderData = data["orderlist"]
     //     .map((product) =>
     // '${product.name} - Quantity: ${product.quantity} - Price: ${product
     //     .price},')
     //     .join('\n');
-    var token = "cgBGjyR1TuioTjrb3kV07R:APA91bHNvg9n7Eif6fuvbmOIBSQV1xPHNZlf47w7BC0VXQ9qBDpAfdhwKcDfCch2sgvOOM2_MB6VXhGHrx54-AY3LsLotWK7HYufpcLKZtpVjoik8oBwBTwIVLOXOGyOXUS47i0UthsR";
+    final String refreshToken = "ya29.c.c0ASRK0Gb3pEb5WaWOgQhvHXu_gmmMKLe0nlTRrNEDapiq1JdYnYYH8dUy-Hqu_6zGYRlHG-tEoRo8X-cequCBCtTd1CkIVoLyJ8G1MhWsZW1U0ObeslnoI2LRINstQIu6LgJ_K-IAkiLBlLPqfDPTTtHFw214aEJBAhyxCw6llPomvhpEw_mwEfRmsq3PC2zeD-fERWQUt2ayAaIKN1plhHejwVtEWm2y7w7Dyi50DMS27XvCROgDCS2rpXO-whvaGAo4M79FOuH3XYS-vENLj-WNFKF7uRcq1zTOYhiS0ahHO8Ny0m6LJej6YEh_ok2F5Yx01pL2ozt5UW_zS5TwWx71PFFKhyZa4rSa_2H3U68Onoeww3vsWPS8H385DqsSYXJ9i7Wg8l8hYhv7Xot8dMxmm5u_Wzn2pVwFUgrfxz_9vqrRI4n7gok39Ip97qX_124Ruq2Ff5yvjZ89XMBk4-yw02b3VrMr19qR8nB3-m8J2X33cxWwp5Vpca-lebSWl9J6qZJ5cpt7gswkcia3mBcF6533JpRVoUnnRtzy2vc3-sXcc2Iw5tW97-j0_F7Jp_ktMRaO5w6nJpoJB4e-6688RihkwY3pixJBQhIyU0zB7U2te5MFWXn1sRthaSl-yzl1h7U78h6Bbax5uSJqIrZWn2IYyWkypvOs6m8aU8i-VoMQle8RimZehmFn62fbznJakh6n6F4cl0neqnraO9qVIjjgrtYcdu23x-IXpRwa32RrXbhOj7i4obftnMn7hsq4wXmI2dkcOvho9uOjeWtpb2M86_M1bbb7Xo9Vl_R8aOiqjVMlMbhc1xec1WwQt0jjeepe0FtYmOcVlf_tmXtlhyncW8ryImmQt8B95QloUntUp8QXnQfx7OwIpciqc0MjQQVY2R0VBwyxiRdmaZkjJZ-s4nuSeMMvImioJnullhbBoi15Zxuvj10RSyyfnMuk4S_aUBVBO1cgVd1ms9x0tec0r0h26sv0zkr7m";
+    var token = "cFzLdxtyTZCZEJigmekGl1:APA91bGvvmX7joVkI1N6PpA0Vc8RMiIFPKbMhmQpzSkZ8aM-XgAOIf1iykLTXqjsgm8q11qfMw8z3KOiGFFYZ20pXOZIgladGwQMzDpR1MFIcsjcUZhKXFC4oY2L1-FTDHGH6wlpucFm";
     final String serverKey = '7664811f1de7ee912bf0d45aae214af6dd6c0272';
     final String serverKeys = 'ya29.a0AcM612zkf2ZWh6xcvQHfJUpO7SJQFDkTkwDBsnrBWUYTJXqam2vndkpLZi0wmdd4uVJHOe558iO3_gY9i-DqTByLb9IegR9t--t4BInzJryxLH0_g2Z_INHweNdCkk7OUPOaXf5wDVvyBl6pq82iK2XbK8u332_D3uXzaCgYKAYoSARMSFQHGX2Mih-ETDbxtG7SZzMDhzKTmBw0171'; // Replace with your server key or use OAuth token
     final String oauthToken = 'MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC30dD3s3JvjpcZt7kmTK1hxHPgKMbjzAZlLe3LIgVFfH28ZMyL8ptixJdIHzecC01ugoi9d+psLKt30dUOZFJPKbo7V6mCymvStN90XisSR4bjMQVj3QF7c+X3pan3h7riUnboaDcoz6piuHYwfoBTO0rGM5lfJ1Abz8/lKNc+qDVSIgdphLmqJ8eS1UOt8l6XDP/gwcpuGUnsAvgLWJG+p3zYYb7eZPviSnQt8STXB2SnUKq1TCQWsMTaQyk66BduNrghFENQB+cu2R0O+20peAG4fqwTbRtSeUSvupUEitkfcj8ADpScKLuAFHibRLjt081PH5vSYOmdvfeqOHtHAgMBAAECggEAAyUJQfuQFR183e6ZMcZftEuj6df4vb6TS27TjG/quYDC4T1eNx9cONPWfLWKrNY6qbh89goo+KxzoIChTaDkvEBL/yY68FGzMi8a9YbY43QAIuncnD6UfxQBVqZpt8zazcgNtbXMCnGHCi+lV04Ktvci39d+eQoXTOqAtXxoi5oAl/Bfb0waMcb9eJBEzCoM90mr4L/EF0r9R/JZ5e4imNNLZrajroWavwKQMKbiBOIs2O1Z2EwYLxEkmD0k+inaRzerqtnc5lkh/5mRk5xRYfwPG27y6tWNYIuDFu8+kvPvLC4YWQ11z/K1hUkOAJo/vl4h20HFlYxeZVF0Qcke4QKBgQD2cbElBbdpregUs9jxUSvtNW+WwGqmWGxnDaCYiUEmi+vuEr8Q/E6v9qnP05i8CGVNPtVH52qDVyWWMmNhh3HAk4ScVzIs1UoSPL8Cn1/LiKQ9P0g4jREKy9UGy8MNn5uim+9gDn4zgR+SHDigNuw4ZyI0RRE0YIx4ydZZ8X3GZwKBgQC+8nysHy3mQZ6+MwilOYhEs++SqcOsieD3qWF1BX1myvEWlzLIGsz6dI6YlSmjWhnC+jpJbOQ4UymvWUXVe6Kv9ugZAW/6WKLiqzBmz4g5eiNSHj889u9eGV8GpV2EE5HVe+CE8kr1beDA939N8qeAptdMOvdqrrEGE8IdOq3YIQKBgBFgcNoobgdQkNWs3LYfQBaotuaNSLfT8kjN6C35N5PNN+SAg+Jht/amUNDrnZBckzAAJy+7vIHoSikuAl3lG/s1K5uOdmY8380rZVh8/lcumk4LQT9jivkU6D9jbKxwPZwYnKdMPk/JYf1+aeu6E6viccH3wL/NsvntWWTcJz8vAoGAEHA7v22nu+zmR6WJFwBO9OswssWerNnp3ihc1YA1fYX3H2TA4G0+PEmQhR5CSWfWU+zK28teEmNGcWwUEP7l0JRHAvAWvcynqS/nqNIw/hG/vLAR7aOsk8NHZQETfe1ZXrGdcJSTU3G0Kaik8wby2KaEXnGtHygO4WEOEwocMUECgYBly5b6yeBqhQGhic/KV71UBbjaENIhm+AQ1rnL0liFulothKrEeaTZg6XNQjGlW0fPoe1UuuHcEbBrckxxeft0s6A84ur255Yq4Me+Gn9Zze7MwssDWXQjt6cMVS5Y1sw3q6hC4K/wzWznLx5ki5QH3zT9e2LNplJqHWaZjC7/sQ=='; // Replace with your OAuth 2.0 access token
-
+    // String newAccessToken = await getNewAccessToken(refreshToken);
+    // refreshAccessToken();
+    final String accessToken = await getAccessToken();
+    print('AccessToken2: $accessToken');
     try {
       final response = await http.post(
         Uri.parse('https://fcm.googleapis.com/v1/projects/justcall-78dcb/messages:send'),
         headers: <String, String>{
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $serverKeys',
+          'Authorization': 'Bearer $accessToken',
+          // 'Authorization': 'Bearer $serverKeys',
         },
         body:
         // jsonEncode(
@@ -233,7 +316,7 @@ class _CartState extends State<CartOut> {
         jsonEncode(
           <String, dynamic>{
             'message': <String, dynamic>{
-              'token': token,
+              'token': appToken,
               'notification': <String, dynamic>{
                 'body': "${data["orderlist"]}",
                 'title': "${data["name"]}",
@@ -653,15 +736,28 @@ class _CartState extends State<CartOut> {
                               "orderstatus" : "new_order"
                             };
                             print("object$data");
-                            setState(() {
-                              indicator = true;
-                            });
-                            sendDeliveryList(data,context);
+
+                            if(orderData != ''){
+                              setState(() {
+                                indicator = true;
+                              });
+                              sendDeliveryList(data,context);
+                            }
+
                           }else{
-                            setState(() {
-                              indicator = true;
-                            });
-                            showInputDialog(context, state.products);
+                            String orderData = state.products
+                                .map((product) =>
+                            '${product.name} - Quantity: ${product.quantity} - Price: ${product
+                                .price},')
+                                .join('\n');
+
+                            if(orderData != ''){
+                              setState(() {
+                                indicator = true;
+                              });
+                              showInputDialog(context, state.products);
+                            }
+
                           }
       
       
