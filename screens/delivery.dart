@@ -1,11 +1,13 @@
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:justcall/components/navbar.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 class Delivery extends StatefulWidget {
   const Delivery({super.key});
 
@@ -14,19 +16,28 @@ class Delivery extends StatefulWidget {
 }
 
 class _DeliveryState extends State<Delivery> {
-
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   late List<dynamic> _productsFuture = [];
   var status = 0;
   bool? indicator = false;
   bool? indicatorStatus = false;
+  late final SharedPreferences prefs;
+
+
   @override
   void initState() {
 
-      fetchAllSubGroupData();
+    _firebaseMessaging.getToken().then((String? token) {
+      assert(token != null);
+      updateDeliveryToken(token);
+    });
+      fetchAllDeliveryData();
 
   }
 
-  void fetchAllSubGroupData() async{
+
+
+  void fetchAllDeliveryData() async{
 
     try {
       // final Data = {
@@ -107,7 +118,7 @@ class _DeliveryState extends State<Delivery> {
         // setState(() {
         //   orderPlaced = 'Your order has been placed successfully!';
         // });
-         fetchAllSubGroupData();
+        fetchAllDeliveryData();
         // showOrderPlacedDialog(context);
 
       } else {
@@ -124,6 +135,57 @@ class _DeliveryState extends State<Delivery> {
       });
       print('Exception occurred: $e');
     }
+
+  }
+
+  void updateDeliveryToken(String? token) async {
+    prefs = await SharedPreferences.getInstance();
+    String? fcmToken = prefs.getString('FCMTOKEN');
+    String? tt = token;
+    if (fcmToken == null) {
+
+      prefs.setString('FCMTOKEN', tt!);
+    try {
+      var data = {
+        'token': token,
+        'id': 1
+      };
+      final response = await http.put(
+        Uri.parse(
+            "https://justcalltest.onrender.com/api/users/updateDeliveryAppToken"),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        // Successfully sent data
+        // setState(() {
+        //   indicatorStatus = false;
+        // });
+        print('Data updated successfully');
+        // setState(() {
+        //   orderPlaced = 'Your order has been placed successfully!';
+        // });
+        // fetchAllDeliveryData();
+        // showOrderPlacedDialog(context);
+
+      } else {
+        // Error occurred while sending data
+        // setState(() {
+        //   indicatorStatus = false;
+        // });
+        print('Failed to send data: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Exception occurred
+      // setState(() {
+      //   indicatorStatus = false;
+      // });
+      print('Exception occurred: $e');
+    }
+  }
 
   }
 
@@ -159,7 +221,7 @@ class _DeliveryState extends State<Delivery> {
                       setState(() {
                         status = 0;
                       });
-                      fetchAllSubGroupData();
+                      fetchAllDeliveryData();
                     },
                     child: Padding(
                         padding: EdgeInsets.all(5),
@@ -186,7 +248,7 @@ class _DeliveryState extends State<Delivery> {
                       setState(() {
                         status = 1;
                       });
-                      fetchAllSubGroupData();
+                      fetchAllDeliveryData();
                     },
                     child: Padding(
                       padding: EdgeInsets.all(5),
@@ -210,7 +272,7 @@ class _DeliveryState extends State<Delivery> {
                       setState(() {
                         status = 2;
                       });
-                      fetchAllSubGroupData();
+                      fetchAllDeliveryData();
                     },
                     child: Padding(
                       padding: EdgeInsets.all(5),
@@ -228,7 +290,7 @@ class _DeliveryState extends State<Delivery> {
                 ),
                 GestureDetector(
                   onTap:(){
-                    fetchAllSubGroupData();
+                    fetchAllDeliveryData();
                   },
                   child: FaIcon(
                     FontAwesomeIcons.refresh,
